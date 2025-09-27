@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Text to Speech</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            font-weight: 600;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        select, input[type="range"] {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        select:focus, input[type="range"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[type="range"] {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .range-value {
+            font-size: 12px;
+            color: #718096;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
+            color: white;
+        }
+
+        .btn-listening {
+            background: linear-gradient(135deg, #f56565 0%, #fc8181 100%);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn-sign-active {
+            background: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn-sign-active:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(245, 101, 101, 0.3);
+        }
+
+        .video-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            height: 240px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            overflow: hidden;
+            display: none;
+            z-index: 999;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .video-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .sign-captions-container {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .sign-captions-box {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 18px;
+            line-height: 1.4;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(65, 153, 225, 0.3);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sign-captions-text {
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+
+        .current-letter {
+            font-size: 24px;
+            font-weight: bold;
+            margin-right: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
+        .sign-word {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin: 2px;
+            display: inline-block;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .status.speaking {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status.idle {
+            background: #f7fafc;
+            color: #718096;
+            border: 1px solid #e2e8f0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .error {
+            background: linear-gradient(135deg, #fc8181 0%, #f56565 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .captions-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .captions-box {
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 18px;
+            line-height: 1.4;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .captions-text {
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+
+        .interim-text {
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        .final-text {
+            opacity: 1;
+            font-weight: 500;
+        }
+
+        .captions-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .caption-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .caption-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Real-Time Speech & Text</h1>
+        
+        <div class="input-section">
+            <textarea 
+                id="textInput" 
+                placeholder="Type your text here or use 'Start Listening' to speak into the microphone..."
+                autocomplete="off"
+            ></textarea>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="voiceSelect">Voice:</label>
+                <select id="voiceSelect">
+                    <option value="">Loading voices...</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="rateSlider">Speed:</label>
+                <input type="range" id="rateSlider" min="0.1" max="2" step="0.1" value="1">
+                <div class="range-value" id="rateValue">1.0x</div>
+            </div>
+
+            <div class="control-group">
+                <label for="pitchSlider">Pitch:</label>
+                <input type="range" id="pitchSlider" min="0" max="2" step="0.1" value="1">
+                <div class="range-value" id="pitchValue">1.0</div>
+            </div>
+
+            <div class="control-group">
+                <label for="volumeSlider">Volume:</label>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1">
+                <div class="range-value" id="volumeValue">100%</div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button id="speakBtn" class="btn-primary">
+                🎵 Speak Text
+            </button>
+            <button id="pauseBtn" class="btn-secondary">
+                ⏸️ Pause
+            </button>
+            <button id="resumeBtn" class="btn-secondary">
+                ▶️ Resume
+            </button>
+            <button id="stopBtn" class="btn-danger">
+                🛑 Stop
+            </button>
+            <button id="listenBtn" class="btn-primary" style="background: linear-gradient(135deg, #38a169 0%, #48bb78 100%);">
+                🎤 Start Listening
+            </button>
+            <button id="signBtn" class="btn-primary" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);">
+                👋 Start Sign Recognition
+            </button>
+            <button id="clearBtn" class="btn-secondary">
+                🗑️ Clear Text
+            </button>
+        </div>
+
+        <div id="status" class="status idle">Ready to speak</div>
+        <div id="error" style="display: none;"></div>
+    </div>
+
+    <div id="captionsContainer" class="captions-container">
+        <div class="captions-box">
+            <div id="captionsText" class="captions-text">🎤 Start speaking...</div>
+        </div>
+        <div class="captions-controls">
+            <button id="copyCaptionsBtn" class="caption-btn">📋 Copy to Text</button>
+            <button id="clearCaptionsBtn" class="caption-btn">🗑️ Clear</button>
+        </div>
+    </div>
+
+    <div id="signCaptionsContainer" class="sign-captions-container">
+        <div class="sign-captions-box">
+            <div id="signCaptionsText" class="sign-captions-text">👋 Start signing...</div>
+        </div>
+        <div class="captions-controls">
+            <button id="copySignCaptionsBtn" class="caption-btn">📋 Copy to Text</button>
+            <button id="clearSignCaptionsBtn" class="caption-btn">🗑️ Clear</button>
+            <button id="addSpaceBtn" class="caption-btn">⎵ Add Space</button>
+        </div>
+    </div>
+
+    <div id="videoContainer" class="video-container">
+        <video id="videoFeed" class="video-feed" autoplay muted></video>
+        <canvas id="canvasOverlay" class="canvas-overlay"></canvas>
+        <div class="video-overlay">ISL Recognition (Model)</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+
+    <script>
+        class TextToSpeech {
+            constructor() {
+                this.synth = window.speechSynthesis;
+                this.recognition = null;
+                this.voices = [];
+                this.currentUtterance = null;
+                this.isRealTimeMode = false;
+                this.isListening = false;
+                this.lastText = '';
+                this.captionsText = '';
+                this.typingTimer = null;
+                this.isSignRecognizing = false;
+                this.signCaptionsText = '';
+                this.currentLetter = '';
+                this.letterStabilityCount = 0;
+                this.requiredStability = 3;
+                this.hands = null;
+                this.camera = null;
+                this.model = null;
+                this.predictionSmoother = [];
+                this.smoothingWindow = 5;
+                this.labels = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+                
+                this.initElements();
+                this.initSpeechRecognition();
+                this.loadVoices();
+                this.bindEvents();
+                this.checkCompatibility();
+                this.loadTfModel();
+            }
+
+            initElements() {
+                this.textInput = document.getElementById('textInput');
+                this.voiceSelect = document.getElementById('voiceSelect');
+                this.rateSlider = document.getElementById('rateSlider');
+                this.pitchSlider = document.getElementById('pitchSlider');
+                this.volumeSlider = document.getElementById('volumeSlider');
+                this.speakBtn = document.getElementById('speakBtn');
+                this.pauseBtn = document.getElementById('pauseBtn');
+                this.resumeBtn = document.getElementById('resumeBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.listenBtn = document.getElementById('listenBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.status = document.getElementById('status');
+                this.error = document.getElementById('error');
+                this.rateValue = document.getElementById('rateValue');
+                this.pitchValue = document.getElementById('pitchValue');
+                this.volumeValue = document.getElementById('volumeValue');
+                this.captionsContainer = document.getElementById('captionsContainer');
+                this.captionsTextEl = document.getElementById('captionsText');
+                this.copyCaptionsBtn = document.getElementById('copyCaptionsBtn');
+                this.clearCaptionsBtn = document.getElementById('clearCaptionsBtn');
+                this.signBtn = document.getElementById('signBtn');
+                this.signCaptionsContainer = document.getElementById('signCaptionsContainer');
+                this.signCaptionsTextEl = document.getElementById('signCaptionsText');
+                this.copySignCaptionsBtn = document.getElementById('copySignCaptionsBtn');
+                this.clearSignCaptionsBtn = document.getElementById('clearSignCaptionsBtn');
+                this.addSpaceBtn = document.getElementById('addSpaceBtn');
+                this.videoContainer = document.getElementById('videoContainer');
+                this.videoFeed = document.getElementById('videoFeed');
+                this.canvasOverlay = document.getElementById('canvasOverlay');
+            }
+
+            async loadTfModel() {
+                try {
+                    console.log('Loading model from web_model/model.json');
+                    // Try loading with explicit weights path
+                    this.model = await tf.loadLayersModel('web_model/model.json');
+                    console.log('TF.js model loaded successfully');
+                    console.log('Model input shape:', this.model.inputs[0].shape);
+                } catch (e) {
+                    console.error('Model loading failed:', e);
+                    console.log('Trying alternative loading method...');
+                    try {
+                        // Alternative: load from saved_model format
+                        this.model = await tf.loadGraphModel('web_model/saved_model/model.json');
+                        console.log('Model loaded from saved_model format');
+                    } catch (e2) {
+                        console.error('Alternative loading also failed:', e2);
+                        console.warn('Model not found yet. Train and place in web_model/.');
+                    }
+                }
+            }
+
+            checkCompatibility() {
+                if (!('speechSynthesis' in window)) {
+                    this.showError('Text-to-speech is not supported in this browser.');
+                    return false;
+                }
+                
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    this.showError('Speech recognition is not supported in this browser.');
+                    this.listenBtn.disabled = true;
+                    this.listenBtn.textContent = '🎤 Not Supported';
+                }
+                
+                return true;
+            }
+
+            initSpeechRecognition() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                
+                if (SpeechRecognition) {
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = true;
+                    this.recognition.interimResults = true;
+                    this.recognition.lang = 'en-US';
+
+                    this.recognition.onstart = () => {
+                        this.isListening = true;
+                        this.updateListenButton();
+                        this.showCaptions();
+                        this.updateStatus('Listening...', 'speaking');
+                    };
+
+                    this.recognition.onresult = (event) => {
+                        let finalTranscript = '';
+                        let interimTranscript = '';
+
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            const transcript = event.results[i][0].transcript;
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript;
+                            } else {
+                                interimTranscript += transcript;
+                            }
+                        }
+
+                        this.updateCaptions(finalTranscript, interimTranscript);
+
+                        if (finalTranscript) {
+                            this.captionsText += (this.captionsText ? ' ' : '') + finalTranscript.trim();
+                        }
+                    };
+
+                    this.recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        this.isListening = false;
+                        this.updateListenButton();
+                        this.updateStatus('Ready to speak', 'idle');
+                        
+                        if (event.error === 'not-allowed') {
+                            this.showError('Microphone access denied.');
+                        } else if (event.error === 'network') {
+                            this.showError('Network error.');
+                        } else {
+                            this.showError(`Speech recognition error: ${event.error}`);
+                        }
+                    };
+
+                    this.recognition.onend = () => {
+                        this.isListening = false;
+                        this.updateListenButton();
+                        this.hideCaptions();
+                        this.updateStatus('Ready to speak', 'idle');
+                    };
+                }
+            }
+
+            loadVoices() {
+                const loadVoicesCallback = () => {
+                    this.voices = this.synth.getVoices();
+                    this.populateVoiceSelect();
+                };
+
+                loadVoicesCallback();
+
+                if (this.synth.onvoiceschanged !== undefined) {
+                    this.synth.onvoiceschanged = loadVoicesCallback;
+                }
+
+                setTimeout(loadVoicesCallback, 100);
+            }
+
+            populateVoiceSelect() {
+                this.voiceSelect.innerHTML = '';
+                
+                if (this.voices.length === 0) {
+                    this.voiceSelect.innerHTML = '<option value="">No voices available</option>';
+                    return;
+                }
+
+                const voiceGroups = {};
+                this.voices.forEach((voice, index) => {
+                    const lang = voice.lang.split('-')[0];
+                    if (!voiceGroups[lang]) voiceGroups[lang] = [];
+                    voiceGroups[lang].push({voice, index});
+                });
+
+                this.voiceSelect.innerHTML = '<option value="">Default Voice</option>';
+
+                Object.keys(voiceGroups).sort().forEach(lang => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = lang.toUpperCase();
+                    
+                    voiceGroups[lang].forEach(({voice, index}) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        if (voice.default) option.textContent += ' - Default';
+                        optgroup.appendChild(option);
+                    });
+                    
+                    this.voiceSelect.appendChild(optgroup);
+                });
+            }
+
+            bindEvents() {
+                this.textInput.addEventListener('input', (e) => {
+                    if (this.isListening || this.isSignRecognizing) {
+                        return;
+                    }
+                    
+                    clearTimeout(this.typingTimer);
+                    this.typingTimer = setTimeout(() => {
+                        const currentText = this.textInput.value.trim();
+                        if (currentText && currentText !== this.lastText) {
+                            const newText = this.getNewText(this.lastText, currentText);
+                            if (newText) {
+                                this.speak(newText, true);
+                            }
+                            this.lastText = currentText;
+                        }
+                    }, 800);
+                });
+
+                this.rateSlider.addEventListener('input', (e) => {
+                    this.rateValue.textContent = `${e.target.value}x`;
+                });
+
+                this.pitchSlider.addEventListener('input', (e) => {
+                    this.pitchValue.textContent = e.target.value;
+                });
+
+                this.volumeSlider.addEventListener('input', (e) => {
+                    this.volumeValue.textContent = `${Math.round(e.target.value * 100)}%`;
+                });
+
+                this.speakBtn.addEventListener('click', () => {
+                    const text = this.textInput.value.trim();
+                    if (text) {
+                        this.speak(text);
+                    } else {
+                        this.showError('Please enter some text to speak');
+                        setTimeout(() => this.hideError(), 3000);
+                    }
+                });
+
+                this.pauseBtn.addEventListener('click', () => this.pause());
+                this.resumeBtn.addEventListener('click', () => this.resume());
+                this.stopBtn.addEventListener('click', () => this.stop());
+                this.listenBtn.addEventListener('click', () => this.toggleListening());
+                this.clearBtn.addEventListener('click', () => this.clearText());
+                this.copyCaptionsBtn.addEventListener('click', () => this.copyCaptionsToText());
+                this.clearCaptionsBtn.addEventListener('click', () => this.clearCaptions());
+                this.signBtn.addEventListener('click', () => this.toggleSignRecognition());
+                this.copySignCaptionsBtn.addEventListener('click', () => this.copySignCaptionsToText());
+                this.clearSignCaptionsBtn.addEventListener('click', () => this.clearSignCaptions());
+                this.addSpaceBtn.addEventListener('click', () => this.addSpaceToSignCaptions());
+            }
+
+            getNewText(oldText, newText) {
+                if (!oldText) return newText;
+                if (newText.startsWith(oldText)) {
+                    const addedText = newText.slice(oldText.length).trim();
+                    return addedText;
+                }
+                return newText;
+            }
+
+            speak(text, isRealTime = false) {
+                this.synth.cancel();
+
+                if (!text.trim()) return;
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                if (this.voiceSelect.value) {
+                    utterance.voice = this.voices[parseInt(this.voiceSelect.value)];
+                }
+
+                utterance.rate = parseFloat(this.rateSlider.value);
+                utterance.pitch = parseFloat(this.pitchSlider.value);
+                utterance.volume = parseFloat(this.volumeSlider.value);
+
+                utterance.onstart = () => {
+                    this.currentUtterance = utterance;
+                    this.updateStatus('Speaking...', 'speaking');
+                    this.hideError();
+                };
+
+                utterance.onend = () => {
+                    this.currentUtterance = null;
+                    this.updateStatus('Ready to speak', 'idle');
+                };
+
+                utterance.onerror = (event) => {
+                    this.currentUtterance = null;
+                    this.updateStatus('Ready to speak', 'idle');
+                    this.showError(`Speech error: ${event.error}`);
+                };
+
+                utterance.onpause = () => {
+                    this.updateStatus('Paused', 'idle');
+                };
+
+                utterance.onresume = () => {
+                    this.updateStatus('Speaking...', 'speaking');
+                };
+
+                this.synth.speak(utterance);
+            }
+
+            pause() {
+                if (this.synth.speaking && !this.synth.paused) {
+                    this.synth.pause();
+                }
+            }
+
+            resume() {
+                if (this.synth.paused) {
+                    this.synth.resume();
+                }
+            }
+
+            stop() {
+                this.synth.cancel();
+                this.currentUtterance = null;
+                this.updateStatus('Ready to speak', 'idle');
+                clearTimeout(this.typingTimer);
+            }
+
+            updateStatus(message, className) {
+                this.status.textContent = message;
+                this.status.className = `status ${className}`;
+            }
+
+            showError(message) {
+                this.error.textContent = message;
+                this.error.style.display = 'block';
+                this.error.className = 'error';
+            }
+
+            hideError() {
+                this.error.style.display = 'none';
+            }
+
+            toggleListening() {
+                if (!this.recognition) {
+                    this.showError('Speech recognition is not available in this browser.');
+                    return;
+                }
+
+                if (this.isListening) {
+                    this.recognition.stop();
+                } else {
+                    this.recognition.start();
+                }
+            }
+
+            updateListenButton() {
+                if (this.isListening) {
+                    this.listenBtn.textContent = '🛑 Stop Listening';
+                    this.listenBtn.className = 'btn-listening';
+                } else {
+                    this.listenBtn.textContent = '🎤 Start Listening';
+                    this.listenBtn.className = 'btn-primary';
+                    this.listenBtn.style.background = 'linear-gradient(135deg, #38a169 0%, #48bb78 100%)';
+                }
+            }
+
+            clearText() {
+                this.textInput.value = '';
+                this.lastText = '';
+                this.updateStatus('Text cleared', 'idle');
+            }
+
+            showCaptions() {
+                this.captionsContainer.style.display = 'block';
+                this.captionsTextEl.innerHTML = '<span class="interim-text">🎤 Listening...</span>';
+            }
+
+            hideCaptions() {
+                setTimeout(() => {
+                    if (!this.isListening) {
+                        this.captionsContainer.style.display = 'none';
+                    }
+                }, 2000);
+            }
+
+            updateCaptions(finalText, interimText) {
+                let displayText = '';
+                
+                if (this.captionsText) {
+                    displayText += `<span class="final-text">${this.captionsText}</span>`;
+                }
+                
+                if (finalText) {
+                    displayText += `<span class="final-text"> ${finalText.trim()}</span>`;
+                }
+                
+                if (interimText) {
+                    displayText += `<span class="interim-text"> ${interimText.trim()}</span>`;
+                }
+                
+                if (!displayText) {
+                    displayText = '<span class="interim-text">🎤 Start speaking...</span>';
+                }
+                
+                this.captionsTextEl.innerHTML = displayText;
+            }
+
+            copyCaptionsToText() {
+                if (this.captionsText) {
+                    const currentText = this.textInput.value;
+                    const newText = currentText + (currentText ? ' ' : '') + this.captionsText;
+                    this.textInput.value = newText;
+                    this.lastText = newText;
+                    this.updateStatus('Captions copied to text', 'idle');
+                } else {
+                    this.showError('No captions to copy');
+                    setTimeout(() => this.hideError(), 2000);
+                }
+            }
+
+            clearCaptions() {
+                this.captionsText = '';
+                this.updateCaptions('', '');
+                this.updateStatus('Captions cleared', 'idle');
+            }
+
+            async toggleSignRecognition() {
+                if (this.isSignRecognizing) {
+                    this.stopSignRecognition();
+                } else {
+                    await this.startSignRecognition();
+                }
+            }
+
+            async startSignRecognition() {
+                try {
+                    if (this.isListening) {
+                        this.recognition.stop();
+                    }
+
+                    if (!this.hands) {
+                        await this.initializeMediaPipeHands();
+                    }
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 640, height: 480 } 
+                    });
+                    
+                    this.videoFeed.srcObject = stream;
+                    this.videoContainer.style.display = 'block';
+                    this.showSignCaptions();
+                    
+                    this.isSignRecognizing = true;
+                    this.updateSignButton();
+                    this.updateStatus('Recognizing ISL signs...', 'speaking');
+                    
+                    this.startCamera();
+                    
+                } catch (error) {
+                    console.error('Sign recognition error:', error);
+                    this.showError('Camera access denied or MediaPipe not loaded');
+                    setTimeout(() => this.hideError(), 3000);
+                }
+            }
+             stopSignRecognition() {
+                this.isSignRecognizing = false;
+                this.updateSignButton();
+                this.hideSignCaptions();
+                this.updateStatus('Ready to speak', 'idle');
+    
+                // Stop camera stream
+                 if (this.camera) {
+                    this.camera.stop();
+                    this.camera = null;
+                    }
+    
+                // Stop video feed and clear MediaPipe resources
+                 if (this.videoFeed && this.videoFeed.srcObject) {
+                    const tracks = this.videoFeed.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    this.videoFeed.srcObject = null;
+                    }
+    
+                // Hide video container
+                this.videoContainer.style.display = 'none';
+    
+                // Clear canvas
+                const canvas = this.canvasOverlay;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+                // Reset prediction smoothing
+                this.predictionSmoother = [];
+                this.currentLetter = '';
+                this.letterStabilityCount = 0;
+    
+                console.log('Sign recognition stopped');
+            }
+
+            async initializeMediaPipeHands() {
+                if (typeof Hands === 'undefined') {
+                    throw new Error('MediaPipe not loaded');
+                }
+
+                this.hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+
+                this.hands.setOptions({
+                    selfieMode: true,
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                this.hands.onResults((results) => {
+                    this.onHandResults(results);
+                });
+            }
+
+            startCamera() {
+                if (typeof Camera === 'undefined') {
+                    this.showError('MediaPipe Camera utils not loaded');
+                    return;
+                }
+
+                this.camera = new Camera(this.videoFeed, {
+                    onFrame: async () => {
+                        if (this.hands && this.isSignRecognizing) {
+                            await this.hands.send({ image: this.videoFeed });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+                this.camera.start();
+            }
+
+            onHandResults(results) {
+                const canvas = this.canvasOverlay;
+                const ctx = canvas.getContext('2d');
+                canvas.width = this.videoFeed.videoWidth || 640;
+                canvas.height = this.videoFeed.videoHeight || 480;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const hands = results.multiHandLandmarks;
+                    for (const lm of hands) this.drawLandmarks(ctx, lm);
+
+                    const features = this.extractTwoHandFeatures(results);
+                    const predicted = this.predictLetterFromFeatures(features);
+                    if (predicted) {
+                        if (predicted === this.currentLetter) {
+                            this.letterStabilityCount++;
+                        } else {
+                            this.currentLetter = predicted;
+                            this.letterStabilityCount = 1;
+                        }
+                        this.updateSignCaptions(this.currentLetter, this.letterStabilityCount >= this.requiredStability);
+                        if (this.letterStabilityCount === this.requiredStability) {
+                            this.addLetterToSignCaptions(this.currentLetter);
+                            this.currentLetter = '';
+                            this.letterStabilityCount = 0;
+                        }
+                    }
+                } else {
+                    this.currentLetter = '';
+                    this.letterStabilityCount = 0;
+                    this.updateSignCaptions('', false);
+                }
+            }
+
+            drawLandmarks(ctx, landmarks) {
+                ctx.fillStyle = 'red';
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+
+                const connections = [
+                    [0, 1], [1, 2], [2, 3], [3, 4],
+                    [0, 5], [5, 6], [6, 7], [7, 8],
+                    [5, 9], [9, 10], [10, 11], [11, 12],
+                    [9, 13], [13, 14], [14, 15], [15, 16],
+                    [13, 17], [17, 18], [18, 19], [19, 20],
+                    [0, 17]
+                ];
+
+                for (const [start, end] of connections) {
+                    const startPoint = landmarks[start];
+                    const endPoint = landmarks[end];
+                    
+                    // Mirror the x-coordinates to match the video feed
+                    const startX = (1 - startPoint.x) * ctx.canvas.width;
+                    const startY = startPoint.y * ctx.canvas.height;
+                    const endX = (1 - endPoint.x) * ctx.canvas.width;
+                    const endY = endPoint.y * ctx.canvas.height;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+
+                for (const landmark of landmarks) {
+                    // Mirror the x-coordinates to match the video feed
+                    const x = (1 - landmark.x) * ctx.canvas.width;
+                    const y = landmark.y * ctx.canvas.height;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+
+            preprocessLandmarks(landmarks) {
+                const wrist = landmarks[0];
+                const normalized = [];
+                let maxDist = 1e-6;
+                for (const lm of landmarks) {
+                    const dx = lm.x - wrist.x;
+                    const dy = lm.y - wrist.y;
+                    const dz = (lm.z || 0) - (wrist.z || 0);
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > maxDist) maxDist = dist;
+                }
+                for (const lm of landmarks) {
+                    const dx = (lm.x - wrist.x) / maxDist;
+                    const dy = (lm.y - wrist.y) / maxDist;
+                    const dz = ((lm.z || 0) - (wrist.z || 0)) / maxDist;
+                    normalized.push(dx, dy, dz);
+                }
+                return normalized;
+            }
+
+            extractTwoHandFeatures(results) {
+                const hands = results.multiHandLandmarks || [];
+                if (!hands.length) return new Array(126).fill(0);
+                let left = null, right = null;
+                const handed = results.multiHandedness || [];
+                if (handed.length === hands.length) {
+                    for (let i = 0; i < hands.length; i++) {
+                        const lbl = (handed[i].label || '').toLowerCase();
+                        if (lbl.includes('left')) left = hands[i];
+                        if (lbl.includes('right')) right = hands[i];
+                    }
+                }
+                if (!left || !right) {
+                    const sorted = hands.slice().sort((a,b)=>a[0].x - b[0].x);
+                    left = left || sorted[0] || null;
+                    right = right || sorted[1] || null;
+                }
+                const leftFeat = left ? this.preprocessLandmarks(left) : new Array(63).fill(0);
+                const rightFeat = right ? this.preprocessLandmarks(right) : new Array(63).fill(0);
+                return leftFeat.concat(rightFeat);
+            }
+
+            predictLetterFromFeatures(features) {
+                if (!this.model) {
+                    console.log('Model not loaded yet - using fallback');
+                    // Fallback: simple rule-based recognition for testing
+                    return this.fallbackRecognition(features);
+                }
+                const inputSize = this.model.inputs?.[0]?.shape?.[1] || features.length;
+                console.log('Input size:', inputSize, 'Features length:', features.length);
+                let x = features;
+                if (inputSize === 63 && features.length === 126) {
+                    // fallback to single-hand: prefer left
+                    x = features.slice(0, 63);
+                } else if (inputSize === 126 && features.length === 63) {
+                    x = features.concat(new Array(63).fill(0));
+                }
+                const input = tf.tensor2d([x], [1, inputSize]);
+                const logits = this.model.predict(input);
+                const probs = logits.softmax();
+                const data = probs.dataSync();
+                input.dispose();
+                logits.dispose();
+                probs.dispose();
+
+                this.predictionSmoother.push(data);
+                if (this.predictionSmoother.length > this.smoothingWindow) {
+                    this.predictionSmoother.shift();
+                }
+                const avg = new Array(26).fill(0);
+                for (const arr of this.predictionSmoother) {
+                    for (let i = 0; i < 26; i++) avg[i] += arr[i];
+                }
+                for (let i = 0; i < 26; i++) avg[i] /= this.predictionSmoother.length;
+
+                let bestIdx = 0; let bestVal = -Infinity;
+                for (let i = 0; i < 26; i++) {
+                    if (avg[i] > bestVal) { bestVal = avg[i]; bestIdx = i; }
+                }
+                console.log('Best prediction:', this.labels[bestIdx], 'Confidence:', bestVal.toFixed(3));
+                const threshold = 0.3; // Lowered from 0.6
+                return bestVal >= threshold ? this.labels[bestIdx] : null;
+            }
+
+            fallbackRecognition(features) {
+                // Enhanced fallback: better finger counting simulation
+                const leftHand = features.slice(0, 63);
+                const rightHand = features.slice(63, 126);
+                
+                // Analyze finger positions (landmarks 4,8,12,16,20 are fingertips)
+                const leftFingers = this.countFingersFromFeatures(leftHand);
+                const rightFingers = this.countFingersFromFeatures(rightHand);
+                
+                // Map finger counts to letters (simplified ISL)
+                const totalFingers = leftFingers + rightFingers;
+                
+                if (totalFingers === 0) return 'A'; // Closed fists
+                if (totalFingers === 1) return 'D'; // One finger
+                if (totalFingers === 2) return 'V'; // Two fingers
+                if (totalFingers === 3) return 'W'; // Three fingers
+                if (totalFingers === 4) return 'B'; // Four fingers
+                if (totalFingers === 5) return 'C'; // Open hand
+                if (totalFingers >= 6) return 'E'; // Multiple fingers
+                
+                return null;
+            }
+            
+            countFingersFromFeatures(handFeatures) {
+                // Extract fingertip positions (indices 4,8,12,16,20 in original landmarks)
+                // Each landmark has 3 values (x,y,z), so multiply by 3
+                const fingertipIndices = [4, 8, 12, 16, 20];
+                let count = 0;
+                
+                for (const idx of fingertipIndices) {
+                    const baseIdx = idx * 3;
+                    if (baseIdx + 1 < handFeatures.length) {
+                        const y = handFeatures[baseIdx + 1]; // y coordinate
+                        const wristY = handFeatures[1]; // wrist y coordinate
+                        // If fingertip is above wrist, finger is extended
+                        if (y < wristY - 0.1) count++;
+                    }
+                }
+                return count;
+            }
+
+            updateSignButton() {
+                if (this.isSignRecognizing) {
+                    this.signBtn.textContent = '🛑 Stop Sign Recognition';
+                    this.signBtn.className = 'btn-sign-active';
+                } else {
+                    this.signBtn.textContent = '👋 Start Sign Recognition';
+                    this.signBtn.className = 'btn-primary';
+                    this.signBtn.style.background = 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)';
+                }
+            }
+
+            showSignCaptions() {
+                this.signCaptionsContainer.style.display = 'block';
+                this.signCaptionsTextEl.innerHTML = '<span class="current-letter">👋</span> Show your hand to camera...';
+            }
+
+            hideSignCaptions() {
+                setTimeout(() => {
+                    if (!this.isSignRecognizing) {
+                        this.signCaptionsContainer.style.display = 'none';
+                    }
+                }, 2000);
+            }
+
+            updateSignCaptions(detectedLetter, isStable) {
+                let displayText = '';
+                
+                if (this.signCaptionsText) {
+                    const words = this.signCaptionsText.split(' ');
+                    words.forEach(word => {
+                        if (word) displayText += `<span class="sign-word">${word}</span> `;
+                    });
+                }
+                
+                if (detectedLetter) {
+                    const letterClass = isStable ? 'current-letter' : 'current-letter interim-text';
+                    displayText += `<span class="${letterClass}">${detectedLetter}</span>`;
+                }
+                
+                if (!displayText) {
+                    displayText = '<span class="current-letter">👋</span> Show your hand to camera...';
+                }
+                
+                this.signCaptionsTextEl.innerHTML = displayText;
+            }
+
+            addLetterToSignCaptions(letter) {
+                this.signCaptionsText += letter;
+                this.updateSignCaptions('', false);
+            }
+
+            addSpaceToSignCaptions() {
+                this.signCaptionsText += ' ';
+                this.updateSignCaptions('', false);
+            }
+
+            copySignCaptionsToText() {
+                if (this.signCaptionsText.trim()) {
+                    const currentText = this.textInput.value;
+                    const newText = currentText + (currentText ? ' ' : '') + this.signCaptionsText.trim();
+                    this.textInput.value = newText;
+                    this.lastText = newText;
+                    this.updateStatus('Sign captions copied to text', 'idle');
+                } else {
+                    this.showError('No sign captions to copy');
+                    setTimeout(() => this.hideError(), 2000);
+                }
+            }
+
+            clearSignCaptions() {
+                this.signCaptionsText = '';
+                this.currentLetter = '';
+                this.letterStabilityCount = 0;
+                this.updateSignCaptions('', false);
+                this.updateStatus('Sign captions cleared', 'idle');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new TextToSpeech();
+        });
+    </script>
+</body>
+</html>
+
+
